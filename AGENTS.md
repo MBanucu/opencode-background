@@ -54,6 +54,10 @@
 - Style: Descriptive nested test cases with clear expectations
 - Assertion library: `expect()` (vitest)
 
+## Memory
+
+- Store temporary data in `.memory/` directory (gitignored)
+
 ## Project Context
 
 - **Type**: ES Module package for OpenCode plugin system
