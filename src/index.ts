@@ -16,10 +16,12 @@ interface BackgroundTask {
   pid?: number
 }
 
-export const BackgroundTasksPlugin: Plugin = async (ctx) => {
+export const BackgroundTasksPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
+  // Persistent storage for tasks
   const tasks: Map<string, BackgroundTask> = new Map()
 
   return {
+    // Expose tools for task management
     tool: {
       createBackgroundTask: tool({
         description: "Run a command as a background task with real-time output tracking, session tracking, and optional tags",
@@ -80,7 +82,6 @@ export const BackgroundTasksPlugin: Plugin = async (ctx) => {
         }
       }),
 
-      // Get task status and output
       getBackgroundTask: tool({
         description: "Retrieve details and output of a specific background task",
         args: {
@@ -108,7 +109,6 @@ export const BackgroundTasksPlugin: Plugin = async (ctx) => {
         }
       }),
 
-      // List all tasks with advanced filtering
       listBackgroundTasks: tool({
         description: "List background tasks with advanced filtering options",
         args: {
@@ -144,7 +144,6 @@ export const BackgroundTasksPlugin: Plugin = async (ctx) => {
         }
       }),
 
-      // Kill tasks with advanced filtering
       killTasks: tool({
         description: "Kill background tasks with advanced filtering options",
         args: {
@@ -199,6 +198,24 @@ export const BackgroundTasksPlugin: Plugin = async (ctx) => {
           return JSON.stringify(killedTasks)
         }
       })
+    },
+    
+    // Optional: Hooks for session management
+    event: async ({ event }) => {
+      // Optionally clean up tasks when a session ends
+      if (event.type === 'session.deleted') {
+        const sessionId = event.data.sessionId
+        const tasksToRemove = Array.from(tasks.values())
+          .filter(task => task.sessionId === sessionId)
+        
+        tasksToRemove.forEach(task => {
+          try {
+            // Attempt to kill any lingering processes
+            process.kill(task.pid || 0)
+          } catch {}
+          tasks.delete(task.id)
+        })
+      }
     }
   }
 }
