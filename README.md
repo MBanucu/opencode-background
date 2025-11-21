@@ -12,6 +12,55 @@ Create or edit your OpenCode configuration file (typically `~/.config/opencode/c
 }
 ```
 
+## Usage
+
+### Example 1: Build Pipeline Management
+
+```
+I need to run and monitor multiple background processes for a build pipeline:
+
+1. Start a long-running build process tagged as ["build", "critical"] that runs: `bun build ./src/index.ts --outdir dist --target bun`
+2. Start a test runner tagged as ["test", "validation"] that runs: `bun test --watch`
+3. Start a global process tagged as ["lint"] for linting: `mise run lint` (should persist across sessions)
+4. List all current processes and show me their statuses
+5. List only the processes tagged with "critical" or "validation"
+6. Kill the test runner process, then list remaining processes
+7. Show all currently running processes one more time to verify
+
+Walk me through each step so I can see how the plugin handles concurrent processes, filtering, and termination.
+```
+
+**Demonstrates:**
+
+- Creating multiple background processes
+- Using tags for categorization
+- Global vs session-specific processes
+- Listing and filtering by tags
+- Process termination
+- Real-time status tracking
+
+### Example 2: Web Server and Concurrent Testing
+
+```
+Let's test running a web server in the background (use fake json api server):
+- Run the server
+- Test that it's still running
+- Execute a sync cmd (without background) to curl results from the server
+- Test that it's still running
+- Run a subagent that runs cmds to test the server too
+- Confirm the subagent's results
+```
+
+**Demonstrates:**
+
+- Long-running background services (JSON API server)
+- Interleaving background processes with foreground commands
+- Process monitoring across concurrent operations
+- Subagent coordination with background processes
+- Data persistence through process lifecycle
+- Full CRUD operations validation while service runs continuously
+- Real-time process status verification
+
 ## Features
 
 - 🚀 Create background processes with real-time output tracking
