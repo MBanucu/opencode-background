@@ -9,14 +9,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  actions: read
   contents: write
-  deployments: write
   pull-requests: write
-  id-token: write # needed for npm oicd login
 
 jobs:
-  Process:
+  process:
     runs-on: ubuntu-latest
     outputs:
       releases_created: ${{ steps.release-please.outputs.releases_created }}
@@ -25,39 +22,27 @@ jobs:
       - uses: google-github-actions/release-please-action@v4
         id: release-please
         with:
-          token: ${{secrets.RELEASE_PLEASE_TOKEN}}
-      - name: Print Release Data
-        run: |
-          echo 'Release Data:'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: node
+          skip-github-pull-request: false
 
-          echo '''
-            ${{ toJSON(steps.release-please.outputs) }}
-          '''
-
-  Deploy:
-    needs: Process
+  dispatch-publish:
+    needs: process
     runs-on: ubuntu-latest
+    if: needs.process.outputs.releases_created == 'true' || needs.process.outputs.prs_created == 'true'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Tooling
-        uses: jdx/mise-action@d6e32c1796099e0f1f3ac741c220a8b7eae9e5dd
+      - name: Dispatch publish for releases
+        if: needs.process.outputs.releases_created == 'true'
+        uses: peter-evans/repository-dispatch@v2
         with:
-          install: true
-          cache: true
-          experimental: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: publish-package
+          client-payload: '{"tag": "latest"}'
 
-      - name: Preflight
-        run: |
-          mise run setup
-          mise run build
-
-      - if: ${{ needs.Process.outputs.releases_created == 'true' }}
-        run: mise run publish --tag latest
-
-      - if: ${{ needs.Process.outputs.prs_created == 'true' }}
-        name: Generate prerelease version and publish
-        run: |
-          bun pm version prerelease && git push origin main
-          mise run publish --tag next
+      - name: Dispatch publish for prerelease
+        if: needs.process.outputs.prs_created == 'true'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: publish-package
+          client-payload: '{"tag": "next"}'
