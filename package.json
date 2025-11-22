@@ -4,6 +4,10 @@
   "description": "Background Tasks Plugin for OpenCode",
   "type": "module",
   "module": "src/index.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/airtonix/opencode-background"
+  },
   "publishConfig": {
     "access": "public",
     "provenance": true
