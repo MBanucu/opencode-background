@@ -8,6 +8,12 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      # Shared shell variable block for deduplication
+      sharedVars = ''
+        PLUGIN_DIR="$HOME/.config/opencode/plugin"
+        TARGET="$PLUGIN_DIR/opencode-background.js"
+        TARGET_DIR="$PLUGIN_DIR/opencode-background"
+      '';
     in
     {
       packages.${system} = {
@@ -25,18 +31,15 @@
           runtimeInputs = [ pkgs.coreutils ];
 
           text = ''
-            PLUGIN_DIR="$HOME/.config/opencode/plugin"
+            ${sharedVars}
             SRC_OPENCODE_BACKGROUND_DIR="${
               self.packages.${system}.default
             }/lib/node_modules/@mbanucu/opencode-background"
             SRC_INDEX="$SRC_OPENCODE_BACKGROUND_DIR/dist/index.js"
-            TARGET="$PLUGIN_DIR/opencode-background.js"
-            TARGET_DIR="$PLUGIN_DIR/opencode-background"
 
             echo "Installing OpenCod(e Background plugin..."
 
             mkdir -p "$PLUGIN_DIR"
-
             whoami
 
             if [ -f "$SRC_INDEX" ]; then
@@ -44,10 +47,9 @@
 
               # Only chmod if the directory exists
               if [[ -d "$TARGET_DIR" ]]; then
-                  chmod -R u+w "$TARGET_DIR"
+                chmod -R u+w "$TARGET_DIR"
               fi
               cp -rf "$SRC_OPENCODE_BACKGROUND_DIR" "$PLUGIN_DIR/"
-              
               echo "✅ Plugin installed as $TARGET"
               echo "   OpenCode will load it automatically on next start/reload."
             else
@@ -63,9 +65,7 @@
           runtimeInputs = [ pkgs.coreutils ];
 
           text = ''
-            PLUGIN_DIR="$HOME/.config/opencode/plugin"
-            TARGET="$PLUGIN_DIR/opencode-background.js"
-            TARGET_DIR="$PLUGIN_DIR/opencode-background"
+            ${sharedVars}
 
             echo "Uninstalling OpenCode Background plugin..."
 
