@@ -29,6 +29,9 @@ jobs:
           cache: true
           experimental: true
 
+      - name: Install Dependencies
+        run: mise install
+
       - name: Build
         run: mise run build
 
