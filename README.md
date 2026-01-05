@@ -10,7 +10,7 @@ Create or edit your OpenCode configuration file (typically `~/.config/opencode/c
 
 ```json
 {
-  "plugins": ["@zenobius/opencode-background"]
+  "plugins": ["@mbanucu/opencode-background"]
 }
 ```
 
