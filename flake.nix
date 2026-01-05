@@ -37,7 +37,7 @@
             }/lib/node_modules/@mbanucu/opencode-background"
             SRC_INDEX="$SRC_OPENCODE_BACKGROUND_DIR/dist/index.js"
 
-            echo "Installing OpenCod(e Background plugin..."
+            echo "Installing OpenCode Background plugin..."
 
             mkdir -p "$PLUGIN_DIR"
             whoami
