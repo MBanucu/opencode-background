@@ -31,7 +31,7 @@ jobs:
 
       - name: Build
         run: |
-          mise run setup
+          npm install
           mise run build
 
       - id: inputs
