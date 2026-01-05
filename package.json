@@ -6,7 +6,7 @@
   "module": "src/index.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MBanucu/opencode-background"
+    "url": "git+https://github.com/MBanucu/opencode-background.git"
   },
   "publishConfig": {
     "access": "public",
