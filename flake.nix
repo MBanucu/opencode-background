@@ -8,8 +8,6 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      lib = pkgs.lib;
-      stdenv = pkgs.stdenv;
     in
     {
       packages.${system} = {
@@ -21,18 +19,73 @@
           nativeBuildInputs = [ pkgs.bun ];
         };
 
-        build = stdenv.mkDerivation {
-          pname = "opencode-background-build";
-          version = "0.2.0-alpha.2";
-          src = ./.;
-          buildInputs = [ pkgs.nodejs ];
-          buildPhase = ''
-            # npm install
-            npm run build
+        install = pkgs.writeShellApplication {
+          name = "install-opencode-background";
+
+          runtimeInputs = [ pkgs.coreutils ];
+
+          text = ''
+            PLUGIN_DIR="$HOME/.config/opencode/plugin"
+            SRC_OPENCODE_BACKGROUND_DIR="${
+              self.packages.${system}.default
+            }/lib/node_modules/@mbanucu/opencode-background"
+            SRC_INDEX="$SRC_OPENCODE_BACKGROUND_DIR/dist/index.js"
+            TARGET="$PLUGIN_DIR/opencode-background.js"
+            TARGET_DIR="$PLUGIN_DIR/opencode-background"
+
+            echo "Installing OpenCod(e Background plugin..."
+
+            mkdir -p "$PLUGIN_DIR"
+
+            whoami
+
+            if [ -f "$SRC_INDEX" ]; then
+              cp -f "$SRC_INDEX" "$TARGET"
+
+              # Only chmod if the directory exists
+              if [[ -d "$TARGET_DIR" ]]; then
+                  chmod -R u+w "$TARGET_DIR"
+              fi
+              cp -rf "$SRC_OPENCODE_BACKGROUND_DIR" "$PLUGIN_DIR/"
+              
+              echo "✅ Plugin installed as $TARGET"
+              echo "   OpenCode will load it automatically on next start/reload."
+            else
+              echo "Error: Built index.js not found! Build may have failed."
+              exit 1
+            fi
           '';
-          installPhase = ''
-            mkdir -p $out
-            cp -r dist $out/
+        };
+
+        uninstall = pkgs.writeShellApplication {
+          name = "uninstall-opencode-background";
+
+          runtimeInputs = [ pkgs.coreutils ];
+
+          text = ''
+            PLUGIN_DIR="$HOME/.config/opencode/plugin"
+            TARGET="$PLUGIN_DIR/opencode-background.js"
+            TARGET_DIR="$PLUGIN_DIR/opencode-background"
+
+            echo "Uninstalling OpenCode Background plugin..."
+
+            if [ -f "$TARGET" ]; then
+              chmod -R u+w "$TARGET"
+              rm "$TARGET"
+              echo "✅ Removed $TARGET"
+            else
+              echo "Plugin file not found: $TARGET"
+            fi
+
+            if [[ -d "$TARGET_DIR" ]]; then
+              chmod -R u+w "$TARGET_DIR"
+              rm -rf "$TARGET_DIR"
+              echo "✅ Removed $TARGET_DIR"
+            else
+              echo "Plugin directory not found: $TARGET_DIR"
+            fi
+
+            echo "   Restart or reload OpenCode to unload the plugin."
           '';
         };
       };
