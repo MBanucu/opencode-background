@@ -29,11 +29,10 @@ jobs:
           cache: true
           experimental: true
 
-      - name: Install Dependencies
-        run: mise install
-
       - name: Build
-        run: mise run build
+        run: |
+          mise run setup
+          mise run build
 
       - id: inputs
         uses: simenandre/setup-inputs@v1
