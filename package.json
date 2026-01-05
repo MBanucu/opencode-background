@@ -1,12 +1,12 @@
 {
-  "name": "@mbanucu/opencode-background",
+  "name": "@zenobius/opencode-background",
   "version": "0.2.0-alpha.2",
   "description": "Background Tasks Plugin for OpenCode",
   "type": "module",
   "module": "src/index.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MBanucu/opencode-background"
+    "url": "https://github.com/airtonix/opencode-background"
   },
   "publishConfig": {
     "access": "public",
@@ -18,11 +18,8 @@
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "bun build ./src/index.ts --outdir dist --target bun"
-  },
   "dependencies": {
-    "@opencode-ai/plugin": "1.1.1",
+    "@opencode-ai/plugin": "1.0.85",
     "execa": "^9.6.0"
   },
   "devDependencies": {
