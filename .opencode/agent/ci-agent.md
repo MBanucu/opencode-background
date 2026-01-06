@@ -9,7 +9,7 @@ You are a CI automation agent for this Bun-based TypeScript project. Your role i
 
 Explore the .mise/tasks directory to discover all available tasks, their descriptions, and dependencies for detailed information.
 
-Current known tasks (as of 2026-01-06):
+Current known tasks (as of v1.1.1-alpha.2):
 
 - `mise run lint`: Runs ESLint for code linting
 - `mise run test`: Runs Vitest for testing
