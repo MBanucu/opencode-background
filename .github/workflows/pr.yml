@@ -44,4 +44,4 @@ jobs:
           mise run build
 
       - name: Verify lockfile consistency
-        run: bun ci && git diff --exit-code bun.lock
+        run: mise run ci && git diff --exit-code bun.lock

@@ -31,7 +31,7 @@ jobs:
 
       - name: Build
         run: |
-          bun ci
+          mise run ci
           mise run build
 
       - id: inputs
