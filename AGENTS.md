@@ -13,6 +13,8 @@ If you are using Nix, enter the dev environment and run quality tools with:
 
 Or run single commands directly, e.g.: `nix develop --command mise run lint`
 
+Note: Avoid quoting multiple commands like `nix develop --command "mise run lint && mise run test"` as it may fail to execute. Run commands separately instead.
+
 - **Build**: `mise run build` or `bun build ./src/index.ts --outdir dist --target bun`
 - **Test**: `mise run test` or `bun test`
 - **Single Test**: `bun test BackgroundTask.test.ts` (use file glob pattern)
