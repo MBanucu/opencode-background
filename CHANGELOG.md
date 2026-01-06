@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-alpha.2](https://github.com/MBanucu/opencode-background/compare/v1.0.0-alpha.2...v1.1.0-alpha.2) (2026-01-06)
+
+
+### Features
+
+* Bun lockfile migration with CI updates ([#14](https://github.com/MBanucu/opencode-background/issues/14)) ([0d35d26](https://github.com/MBanucu/opencode-background/commit/0d35d260cad04cebdfa680e2dd7517f4cd1a666f))
+
 ## [1.0.0-alpha.2](https://github.com/MBanucu/opencode-background/compare/v0.2.0-alpha.2...v1.0.0-alpha.2) (2026-01-06)
 
 
