@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1-alpha.2](https://github.com/MBanucu/opencode-background/compare/v1.1.0-alpha.2...v1.1.1-alpha.2) (2026-01-06)
+
+
+### Bug Fixes
+
+* update ci-agent to use permissions instead of deprecated tools ([5191d55](https://github.com/MBanucu/opencode-background/commit/5191d55b8408921376c1dd65008b4034cf2abc04))
+
 ## [1.1.0-alpha.2](https://github.com/MBanucu/opencode-background/compare/v1.0.0-alpha.2...v1.1.0-alpha.2) (2026-01-06)
 
 
