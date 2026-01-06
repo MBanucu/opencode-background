@@ -94,6 +94,7 @@
         buildInputs = with pkgs; [
           bun
           nodejs
+          mise
         ];
       };
     };
