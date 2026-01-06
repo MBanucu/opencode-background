@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="Install dependencies from lockfile (frozen)"
+bun ci

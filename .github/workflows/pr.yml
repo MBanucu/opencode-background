@@ -32,13 +32,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 
       - name: Run Checks
         run: |
-          mise run setup
+          mise run ci
           mise run lint
           mise run test
           mise run build
+
+      - name: Verify lockfile consistency
+        run: mise run ci && git diff --exit-code bun.lock
