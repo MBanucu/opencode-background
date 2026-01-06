@@ -38,7 +38,7 @@ jobs:
 
       - name: Run Checks
         run: |
-          mise run setup
+          mise run ci
           mise run lint
           mise run test
           mise run build
