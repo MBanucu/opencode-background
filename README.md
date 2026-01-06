@@ -1,8 +1,65 @@
+# OpenCode Background Processes Plugin (fork from zenobi-us/opencode-background)
+
+The original npm package [`@zenobius/opencode-background`](https://www.npmjs.com/package/@zenobius/opencode-background) from https://github.com/zenobi-us/opencode-background isn't being maintained or updated, so I've stepped in with a maintained fork/version.
+
+Until (or if) the original gets attention, use the [`@mbanucu`](https://www.npmjs.com/package/@mbanucu/opencode-background) version instead.
+
+### Demo: How to use @mbanucu/opencode-background
+
+[![How to use @mbanucu/opencode-background](./demo/Running%20background%20processes/python%20server/correct-usage-demo.gif)](https://asciinema.org/a/765970)
+
+Here is the code for the `echo_server.py`:
+
+```py
+import http.server
+import socketserver
+from datetime import datetime
+import json
+
+class EchoHandler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        msg = post_data.decode('utf-8')
+        print(msg, flush=True)
+        now = datetime.now().astimezone().isoformat(timespec='seconds')
+        try:
+            server_ip, server_port = self.connection.getsockname()[:2]
+            server_info = f'{server_ip}:{server_port}'
+        except Exception:
+            server_info = 'unknown'
+        log_object = {
+            'timestamp': now,
+            'message': msg,
+            'client_ip': self.client_address[0],
+            'server': server_info
+        }
+        log_line = json.dumps(log_object, indent=2)
+        with open('echo_server.log', 'a') as f:
+            f.write(log_line + '\n')
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(log_line.encode('utf-8'))
+
+if __name__ == '__main__':
+    with socketserver.TCPServer(("", 0), EchoHandler) as httpd:
+        port = httpd.server_address[1]
+        print(f"Server running on port {port}", flush=True)
+        httpd.serve_forever()
+```
+
+### Links
+
+- Fork/Maintained repo: https://github.com/MBanucu/opencode-background
+- Original repo: https://github.com/zenobi-us/opencode-background
+- npm package (recommended): https://www.npmjs.com/package/@mbanucu/opencode-background
+- Original npm package: https://www.npmjs.com/package/@zenobius/opencode-background
+- How to install plugins from npm in OpenCode: https://opencode.ai/docs/plugins/#from-npm
+
 # OpenCode Background Processes Plugin
 
 A flexible background process management plugin for OpenCode, offering robust process tracking and lifecycle management.
-
-[![asciicast](https://asciinema.org/a/FhwMJK48sUyKzoBe366YuhqS7.svg)](https://asciinema.org/a/FhwMJK48sUyKzoBe366YuhqS7)
 
 ## Installation
 
@@ -10,11 +67,13 @@ Create or edit your OpenCode configuration file (typically `~/.config/opencode/c
 
 ```json
 {
-  "plugins": ["@zenobius/opencode-background"]
+  "plugins": ["@mbanucu/opencode-background"]
 }
 ```
 
 ## Usage
+
+[![asciicast](https://asciinema.org/a/FhwMJK48sUyKzoBe366YuhqS7.svg)](https://asciinema.org/a/FhwMJK48sUyKzoBe366YuhqS7)
 
 ### Example 1: Build Pipeline Management
 
@@ -63,6 +122,10 @@ Let's test running a web server in the background using json-server:
 - Data persistence through process lifecycle
 - Full CRUD operations validation while service runs continuously
 - Real-time process status verification
+
+### Example 3: Do not use the npm version of [@zenobius/opencode-background](https://www.npmjs.com/package/@zenobius/opencode-background)
+
+[![Do not use @zenobius/opencode-background](./demo/Running%20background%20processes/python%20server/incorrect-usage-demo.gif)](https://asciinema.org/a/765983)
 
 ## Features
 
