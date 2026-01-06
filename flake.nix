@@ -19,9 +19,9 @@
       packages.${system} = {
         default = pkgs.buildNpmPackage {
           pname = "opencode-background";
-          version = "0.2.0-alpha.2";
+          version = "1.0.0-alpha.2";
           src = ./.;
-          npmDepsHash = "sha256-R7EAHDF3eVnJvM21Rs1SCXUn4fcsx4tb8noYoTHJsJw=";
+          npmDepsHash = "sha256-jijV/PDulAWWyXMbmlvLKt9mNZkCy91N22zUKH64jOs=";
           nativeBuildInputs = [ pkgs.bun ];
         };
 
@@ -94,6 +94,9 @@
         buildInputs = with pkgs; [
           bun
           nodejs
+          coreutils
+          git
+          mise
         ];
       };
     };
