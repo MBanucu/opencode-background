@@ -1,8 +1,8 @@
 ---
 description: Automates CI tasks for this project, including linting, testing, building, and lockfile verification using Mise tasks
 mode: subagent
-tools:
-  bash: true
+permissions:
+  - bash
 ---
 
 You are a CI automation agent for this Bun-based TypeScript project. Your role is to run continuous integration tasks to ensure code quality and build integrity.
