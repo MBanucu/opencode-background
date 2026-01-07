@@ -63,13 +63,42 @@ A flexible background process management plugin for OpenCode, offering robust pr
 
 ## Installation
 
-Create or edit your OpenCode configuration file (typically `~/.config/opencode/config.json`):
+### Basics
+
+For basic information on installing and using plugins in OpenCode, see [the official documentation](https://opencode.ai/docs/plugins/#use-a-plugin).
+You don't have to read it, but it is helpful if you want to keep your system clean.
+
+### From npm
+
+Create or edit your OpenCode configuration file (typically `~/.config/opencode/opencode.json`):
 
 ```json
 {
   "plugins": ["@mbanucu/opencode-background"]
 }
 ```
+
+This installs the plugin from npm. See [the documentation](https://opencode.ai/docs/plugins/#from-npm) for more details on npm installations.
+
+### via Nix
+
+If you have Nix installed, you can install the plugin directly using:
+
+```bash
+nix run github:MBanucu/opencode-background#install
+```
+
+This will automatically install the plugin to the correct location (`~/.config/opencode/plugin/`).
+
+This installs the plugin as a local file. See [the documentation](https://opencode.ai/docs/plugins/#from-local-files) for more details on local file installations.
+
+To uninstall:
+
+```bash
+nix run github:MBanucu/opencode-background#uninstall
+```
+
+This will remove the plugin files from `~/.config/opencode/plugin/`.
 
 ## Usage
 

@@ -1,13 +1,20 @@
 {
+  description = "A Bun-based project";
+
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    bun2nix.url = "github:nix-community/bun2nix";
   };
 
   outputs =
-    { self, nixpkgs }:
+    inputs@{ self, ... }:
     let
       system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      pkgs = inputs.nixpkgs.legacyPackages.${system};
+      bun2nix = inputs.bun2nix.packages.${system}.default;
+      # Read package.json and extract version
+      packageJson = builtins.fromJSON (builtins.readFile ./package.json);
       # Shared shell variable block for deduplication
       sharedVars = ''
         PLUGIN_DIR="$HOME/.config/opencode/plugin"
@@ -17,12 +24,23 @@
     in
     {
       packages.${system} = {
-        default = pkgs.buildNpmPackage {
+        default = bun2nix.mkDerivation {
           pname = "opencode-background";
-          version = "0.2.0-alpha.2";
+          version = packageJson.version;  # Use extracted version
           src = ./.;
-          npmDepsHash = "sha256-R7EAHDF3eVnJvM21Rs1SCXUn4fcsx4tb8noYoTHJsJw=";
-          nativeBuildInputs = [ pkgs.bun ];
+
+          bunDeps = bun2nix.fetchBunDeps {
+            bunNix = ./bun.nix;
+          };
+
+          buildPhase = ''
+            bun run build
+          '';
+
+          installPhase = ''
+            mkdir -p $out
+            cp -r dist/ README.md CHANGELOG.md package.json LICENSE $out/
+          '';
         };
 
         install = pkgs.writeShellApplication {
@@ -34,13 +52,12 @@
             ${sharedVars}
             SRC_OPENCODE_BACKGROUND_DIR="${
               self.packages.${system}.default
-            }/lib/node_modules/@mbanucu/opencode-background"
+            }"
             SRC_INDEX="$SRC_OPENCODE_BACKGROUND_DIR/dist/index.js"
 
             echo "Installing OpenCode Background plugin..."
 
             mkdir -p "$PLUGIN_DIR"
-            whoami
 
             if [ -f "$SRC_INDEX" ]; then
               cp -f "$SRC_INDEX" "$TARGET"
@@ -49,8 +66,10 @@
               if [[ -d "$TARGET_DIR" ]]; then
                 chmod -R u+w "$TARGET_DIR"
               fi
-              cp -rf "$SRC_OPENCODE_BACKGROUND_DIR" "$PLUGIN_DIR/"
+              mkdir -p "$TARGET_DIR"
+              cp -rf "$SRC_OPENCODE_BACKGROUND_DIR"/* "$TARGET_DIR/"
               echo "✅ Plugin installed as $TARGET"
+              echo "✅ Plugin information installed as \"$TARGET_DIR/\""
               echo "   OpenCode will load it automatically on next start/reload."
             else
               echo "Error: Built index.js not found! Build may have failed."
@@ -90,12 +109,47 @@
         };
       };
 
+      apps.${system} = {
+        install = {
+          type = "app";
+          program = "${self.packages.${system}.install}/bin/install-opencode-background";
+        };
+
+        uninstall = {
+          type = "app";
+          program = "${self.packages.${system}.uninstall}/bin/uninstall-opencode-background";
+        };
+      };
+
       devShells.${system}.default = pkgs.mkShell {
         buildInputs = with pkgs; [
           bun
           nodejs
           mise
+          bun2nix
+          inotify-tools
         ];
+
+        shellHook = ''
+          # bun() {
+          #   command bun "$@"
+          #   if [[ $1 == "install" || $1 == "add" || $1 == "remove" || $1 == "uninstall" ]]; then
+          #     echo "Updating bun.nix..."
+          #     bun2nix -l bun.lock -o bun.nix
+          #   fi
+          # }
+
+          # Start file watcher for bun.lock changes
+          if [[ -f bun.lock ]]; then
+            echo "Starting bun.lock watcher..."
+            inotifywait -m -e modify bun.lock | while read; do
+              echo "bun.lock changed, updating bun.nix..."
+              bun2nix -l bun.lock -o bun.nix
+            done &
+            WATCHER_PID=$!
+            trap "kill $WATCHER_PID" EXIT
+          fi
+        '';
       };
     };
 }
