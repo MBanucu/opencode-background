@@ -131,7 +131,35 @@
         ];
 
         shellHook = ''
-          echo "Starting bun.lock watcher (inlined)..."
+          LOG_FILE="''${PWD}/bun-watcher.log"
+
+          log() {
+            local msg="$*"
+            if [[ -n "$msg" ]]; then
+              printf '[%s] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$msg" >> "$LOG_FILE"
+            else
+              printf '\n' >> "$LOG_FILE"
+            fi
+          }
+
+          # Inform the user once (on stdout)
+          echo "bun.lock watcher active — all messages are logged to:"
+          echo "    $LOG_FILE"
+          echo "Use \`tail -f $LOG_FILE\` to watch live."
+
+          # === Custom Header ===
+          log "=================================================="
+          log "OpenCode Background – Development Shell Session"
+          log "Project:   $(basename "$PWD")"
+          log "Directory: $PWD"
+          log "Started:   $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          log "User:      $USER@$HOSTNAME"
+          log "Nix shell PID: $$"
+          log "=================================================="
+          log ""
+          log "bun.lock watcher session started"
+          log "=================================================="
+          log ""
 
           # Flag to prevent duplicate stop messages
           STOPPING=false
@@ -147,17 +175,16 @@
 
           print_external_warning() {
             local event="$1"
-            echo ""
-            echo "⚠️  WARNING: bun.nix was $event externally!"
-            echo "   bun.nix is an auto-generated file derived from bun.lock."
-            echo "   Do NOT edit, create, or delete it manually."
-            echo "   To change dependencies, use 'bun add', 'bun remove', etc."
+            log "⚠︎ WARNING: bun.nix was $event externally!"
+            log "  bun.nix is an auto-generated file derived from bun.lock."
+            log "  Do NOT edit, create, or delete it manually."
+            log "  To change dependencies, use 'bun add', 'bun remove', etc."
           }
 
           generate_bun_nix_to_temp() {
             local temp="$1"
             if ! bun2nix -l bun.lock -o "$temp"; then
-              echo "Error: bun2nix failed to generate output."
+              log "Error: bun2nix failed to generate output."
               return 1
             fi
             return 0
@@ -180,18 +207,18 @@
 
               if [[ "$expected_sha" == "$current_sha" ]]; then
                 rm -f "$temp"
-                [[ "$quiet" == false ]] && echo "$trigger_msg""bun.nix is already up-to-date with bun.lock."
+                [[ "$quiet" == false ]] && log "$trigger_msg""bun.nix is already up-to-date with bun.lock."
               else
                 if [[ "$current_sha" == "absent" ]]; then
-                  [[ "$quiet" == false ]] && echo "$trigger_msg""bun.lock present → generating new bun.nix..."
+                  [[ "$quiet" == false ]] && log "$trigger_msg""bun.lock present → generating new bun.nix..."
                 else
-                  [[ "$quiet" == false ]] && echo "$trigger_msg""Differences detected → updating bun.nix..."
+                  [[ "$quiet" == false ]] && log "$trigger_msg""Differences detected → updating bun.nix..."
                 fi
                 mv "$temp" bun.nix
               fi
             else
               if [[ -f bun.nix ]]; then
-                [[ "$quiet" == false ]] && echo "$trigger_msg""No bun.lock found → removing stale bun.nix..."
+                [[ "$quiet" == false ]] && log "$trigger_msg""No bun.lock found → removing stale bun.nix..."
                 rm -f bun.nix
               fi
             fi
@@ -202,14 +229,14 @@
             # prevent duplicate cleanup
             if ! $STOPPING; then
               STOPPING=true
-              echo "Stopping bun.lock watcher..."
+              log "Stopping bun.lock watcher..."
               kill $INOTIFY_PID 2>/dev/null || true
               kill $LOOP_PID 2>/dev/null || true
               rm -f "$FIFO" 2>/dev/null || true
             fi
           }
 
-          echo "Checking initial state..."
+          log "Checking initial state..."
           sync_bun_nix "" false
 
           # Create a named pipe
@@ -221,8 +248,7 @@
             -e create -e delete -e modify -e moved_to -e moved_from \
             . > "$FIFO" 2>/dev/null &
           INOTIFY_PID=$!
-          disown $INOTIFY_PID
-          echo "Bun.lock watcher running (inotifywait PID $INOTIFY_PID)."
+          log "Bun.lock watcher running (inotifywait PID $INOTIFY_PID)."
 
           # Background reading loop
           (
@@ -238,14 +264,14 @@
               local updated_sha=$(get_sha bun.nix)
               if [[ "$current_sha" != "$updated_sha" ]]; then
                 print_external_warning "$event"
-                echo "   External changes detected and corrected."
+                log "  External changes detected and corrected."
               fi
             }
 
             while IFS=' ' read -r event file; do
               case "$file" in
                 "bun.lock")
-                  echo "bun.lock was $event – syncing bun.nix to current state..."
+                  log "bun.lock was $event – syncing bun.nix to current state..."
                   sync_bun_nix "" false
                   ;;
                 "bun.nix")
@@ -257,11 +283,12 @@
             exec 3<&-  # Close fd on exit
           ) &
           LOOP_PID=$!
-          disown $LOOP_PID
-          echo "Bun.lock watcher loop running (PID $LOOP_PID)."
+          log "Bun.lock watcher loop running (PID $LOOP_PID)."
 
-          # Clean shutdown – uses dedicated function for easier extension
+          # Clean shutdown
           trap cleanup_watcher EXIT TERM
+
+          log "bun.lock watcher fully initialized."
         '';
       };
     };
