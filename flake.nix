@@ -199,10 +199,24 @@
           echo "Checking initial state..."
           sync_bun_nix "" false
 
-          # Background watcher subshell
+          # Create a named pipe
+          FIFO=$(mktemp -u)
+          mkfifo "$FIFO"
+
+          # Launch inotifywait writing to the fifo
+          inotifywait -m -q --format "%e %f" \
+            -e create -e delete -e modify -e moved_to -e moved_from \
+            . > "$FIFO" 2>/dev/null &
+          INOTIFY_PID=$!
+          disown $INOTIFY_PID
+          echo "Bun.lock watcher running (inotifywait PID $INOTIFY_PID)."
+
+          # Background reading loop using loop-level redirection to keep fifo open
           (
             set +euo pipefail
             set -m
+
+            exec 3< "$FIFO"  # Open fifo for reading on fd 3
 
             handle_bun_nix() {
               local event="$1"
@@ -215,9 +229,6 @@
               fi
             }
 
-            inotifywait -m -q --format "%e %f" \
-              -e create -e delete -e modify -e moved_to -e moved_from \
-              . |
             while IFS=' ' read -r event file; do
               case "$file" in
                 "bun.lock")
@@ -228,13 +239,16 @@
                   handle_bun_nix "$event"
                   ;;
               esac
-            done
-          ) &
-          WATCHER_PID=$!
-          echo "Bun.lock watcher running in background (PID $WATCHER_PID)."
+            done <&3
 
-          # Clean shutdown: group kill + simple pkill fallback (no complex quoting)
-          trap 'if ! $STOPPING; then STOPPING=true; echo "Stopping bun.lock watcher..."; kill -TERM -"$WATCHER_PID" 2>/dev/null || true; pkill inotifywait 2>/dev/null || true; fi' EXIT TERM INT
+            exec 3<&-  # Close fd on exit
+          ) &
+          LOOP_PID=$!
+          disown $LOOP_PID
+          echo "Bun.lock watcher loop running (PID $LOOP_PID)."
+
+          # Clean shutdown
+          trap 'if ! $STOPPING; then STOPPING=true; echo "Stopping bun.lock watcher..."; kill $INOTIFY_PID 2>/dev/null || true; kill $LOOP_PID 2>/dev/null || true; rm -f "$FIFO"; fi' EXIT TERM INT
         '';
       };
     };
