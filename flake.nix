@@ -136,7 +136,7 @@
           log() {
             local msg="$*"
             if [[ -n "$msg" ]]; then
-              printf '[%s] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$msg" >> "$LOG_FILE"
+              printf '[%s] %s\n' "$(date +'%Y-%m-%d %H:%M:%S.%N')" "$msg" >> "$LOG_FILE"
             else
               printf '\n' >> "$LOG_FILE"
             fi
@@ -152,7 +152,7 @@
           log "OpenCode Background – Development Shell Session"
           log "Project:   $(basename "$PWD")"
           log "Directory: $PWD"
-          log "Started:   $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          log "Started:   $(date '+%Y-%m-%d %H:%M:%S.%N %Z')"
           log "User:      $USER@$HOSTNAME"
           log "Nix shell PID: $$"
           log "=================================================="
