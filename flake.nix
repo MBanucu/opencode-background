@@ -234,9 +234,19 @@
           FIFO=$(mktemp -u)
           mkfifo "$FIFO"
 
-          inotifywait -m -q --format "%e %f" \
-            -e create -e delete -e modify -e moved_to -e moved_from \
-            . > "$FIFO" 2>/dev/null &
+
+          if [[ $- == *i* ]]; then
+            echo "Interactive nix develop session detected – starting persistent bun.lock watcher with cleanup on exit"
+            inotifywait -m -q --format "%e %f" \
+              -e create -e delete -e modify -e moved_to -e moved_from \
+              . > "$FIFO" 2>/dev/null &
+          else
+            echo "Non-interactive nix develop --command detected – starting bun.lock watcher with 60s timeout"
+            timeout 60 inotifywait -m -q --format "%e %f" \
+              -e create -e delete -e modify -e moved_to -e moved_from \
+              . > "$FIFO" 2>/dev/null &
+          fi
+
           INOTIFY_PID=$!
           log "Bun.lock watcher running (inotifywait PID $INOTIFY_PID)."
 
@@ -344,8 +354,7 @@
             for i in {1..30}; do
               if grep -q "External changes detected and corrected." bun-watcher.log && [ -f bun.nix ]; then
                 echo "✅ External delete handled correctly"
-                pkill -f inotifywait || true
-                touch $out
+                    touch $out
                 exit 0
               fi
               sleep 1
@@ -353,7 +362,6 @@
 
             echo "❌ External delete not handled"
             cat bun-watcher.log
-            pkill -f inotifywait || true
             exit 1
           '';
 
@@ -363,8 +371,7 @@
             for i in {1..30}; do
               if grep -q "External changes detected and corrected." bun-watcher.log && ! grep -q "# corrupted" bun.nix; then
                 echo "✅ Corruption handled correctly"
-                pkill -f inotifywait || true
-                touch $out
+                    touch $out
                 exit 0
               fi
               sleep 1
@@ -372,7 +379,6 @@
 
             echo "❌ Corruption not handled"
             cat bun-watcher.log
-            pkill -f inotifywait || true
             exit 1
           '';
 
@@ -383,8 +389,7 @@
             for i in {1..30}; do
               if grep -q "External changes detected and corrected." bun-watcher.log && [ -f bun.nix ]; then
                 echo "✅ File move handled correctly"
-                pkill -f inotifywait || true
-                rm -rf move-bun-here
+                    rm -rf move-bun-here
                 touch $out
                 exit 0
               fi
@@ -393,7 +398,6 @@
 
             echo "❌ File move not handled"
             cat bun-watcher.log
-            pkill -f inotifywait || true
             rm -rf move-bun-here
             exit 1
           '';
