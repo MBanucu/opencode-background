@@ -280,214 +280,123 @@
         '';
       };
 
-      checks.${system} = {
-        watcher-init =
-          pkgs.runCommand "watcher-init-test"
-            {
-              nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
-                pkgs.coreutils
-                pkgs.gnugrep
-                pkgs.procps
-              ];
-            }
-            ''
-              set -euo pipefail
+      checks.${system} =
+        let
+          sharedNativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
+            pkgs.coreutils
+            pkgs.gnugrep
+            pkgs.procps
+          ];
+          sharedSetup = ''
+            set -euo pipefail
 
-              tmp=$(mktemp -d)
-              trap "rm -rf $tmp" EXIT
+            tmp=$(mktemp -d)
+            trap "rm -rf $tmp" EXIT
 
-              cp -r ${src}/. $tmp/project
-              chmod -R u+w $tmp/project
-              cd $tmp/project
+            cp -r ${src}/. $tmp/project
+            chmod -R u+w $tmp/project
+            cd $tmp/project
 
-              rm -f bun-watcher.log
+            rm -f bun-watcher.log
 
-              # Start the watcher
-              export HOME=/tmp
-              export USER=nixbld
-              export HOSTNAME=build
-              export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
-              ${self.devShells.${system}.default.shellHook}
+            # Start the watcher
+            export HOME=/tmp
+            export USER=nixbld
+            export HOSTNAME=build
+            export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
+            ${self.devShells.${system}.default.shellHook}
 
-              # Wait for initialization
-              for i in {1..30}; do
-                if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
-                  echo "✅ Watcher initialized successfully"
-                  touch $out
-                  exit 0
-                fi
-                sleep 1
-              done
-
-              echo "❌ Watcher failed to initialize"
-              cat bun-watcher.log
-              exit 1
+            # Wait for init
+            for i in {1..30}; do
+              if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
+                break
+              fi
+              sleep 1
+            done
+          '';
+          makeWatcherTest =
+            name: testBody:
+            pkgs.runCommand "${name}-test" { nativeBuildInputs = sharedNativeBuildInputs; } ''
+              ${sharedSetup}
+              ${testBody}
             '';
+        in
+        {
+          watcher-init = makeWatcherTest "watcher-init" ''
+            # Wait for initialization
+            for i in {1..30}; do
+              if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
+                echo "✅ Watcher initialized successfully"
+                touch $out
+                exit 0
+              fi
+              sleep 1
+            done
 
-        watcher-external-delete =
-          pkgs.runCommand "watcher-external-delete-test"
-            {
-              nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
-                pkgs.coreutils
-                pkgs.gnugrep
-                pkgs.procps
-              ];
-            }
-            ''
-              set -euo pipefail
+            echo "❌ Watcher failed to initialize"
+            cat bun-watcher.log
+            exit 1
+          '';
 
-              tmp=$(mktemp -d)
-              trap "rm -rf $tmp" EXIT
+          watcher-external-delete = makeWatcherTest "watcher-external-delete" ''
+            # Test external deletion
+            rm -f bun.nix
+            for i in {1..30}; do
+              if grep -q "External changes detected and corrected." bun-watcher.log && [ -f bun.nix ]; then
+                echo "✅ External delete handled correctly"
+                pkill -f inotifywait || true
+                touch $out
+                exit 0
+              fi
+              sleep 1
+            done
 
-              cp -r ${src}/. $tmp/project
-              chmod -R u+w $tmp/project
-              cd $tmp/project
+            echo "❌ External delete not handled"
+            cat bun-watcher.log
+            pkill -f inotifywait || true
+            exit 1
+          '';
 
-              rm -f bun-watcher.log
+          watcher-corruption = makeWatcherTest "watcher-corruption" ''
+            # Test corruption
+            echo "# corrupted" >> bun.nix
+            for i in {1..30}; do
+              if grep -q "External changes detected and corrected." bun-watcher.log && ! grep -q "# corrupted" bun.nix; then
+                echo "✅ Corruption handled correctly"
+                pkill -f inotifywait || true
+                touch $out
+                exit 0
+              fi
+              sleep 1
+            done
 
-              # Start the watcher
-              export HOME=/tmp
-              export USER=nixbld
-              export HOSTNAME=build
-              export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
-              ${self.devShells.${system}.default.shellHook}
+            echo "❌ Corruption not handled"
+            cat bun-watcher.log
+            pkill -f inotifywait || true
+            exit 1
+          '';
 
-              # Wait for init
-              for i in {1..30}; do
-                if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
-                  break
-                fi
-                sleep 1
-              done
+          watcher-file-move = makeWatcherTest "watcher-file-move" ''
+            # Test file move
+            mkdir move-bun-here
+            mv bun.nix move-bun-here/
+            for i in {1..30}; do
+              if grep -q "External changes detected and corrected." bun-watcher.log && [ -f bun.nix ]; then
+                echo "✅ File move handled correctly"
+                pkill -f inotifywait || true
+                rm -rf move-bun-here
+                touch $out
+                exit 0
+              fi
+              sleep 1
+            done
 
-              # Test external deletion
-              rm -f bun.nix
-              for i in {1..30}; do
-                if grep -q "External changes detected and corrected." bun-watcher.log && [ -f bun.nix ]; then
-                  echo "✅ External delete handled correctly"
-                  pkill -f inotifywait || true
-                  touch $out
-                  exit 0
-                fi
-                sleep 1
-              done
-
-              echo "❌ External delete not handled"
-              cat bun-watcher.log
-              pkill -f inotifywait || true
-              exit 1
-            '';
-
-        watcher-corruption =
-          pkgs.runCommand "watcher-corruption-test"
-            {
-              nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
-                pkgs.coreutils
-                pkgs.gnugrep
-                pkgs.procps
-              ];
-            }
-            ''
-              set -euo pipefail
-
-              tmp=$(mktemp -d)
-              trap "rm -rf $tmp" EXIT
-
-              cp -r ${src}/. $tmp/project
-              chmod -R u+w $tmp/project
-              cd $tmp/project
-
-              rm -f bun-watcher.log
-
-              # Start the watcher
-              export HOME=/tmp
-              export USER=nixbld
-              export HOSTNAME=build
-              export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
-              ${self.devShells.${system}.default.shellHook}
-
-              # Wait for init
-              for i in {1..30}; do
-                if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
-                  break
-                fi
-                sleep 1
-              done
-
-              # Test corruption
-              echo "# corrupted" >> bun.nix
-              for i in {1..30}; do
-                if grep -q "External changes detected and corrected." bun-watcher.log && ! grep -q "# corrupted" bun.nix; then
-                  echo "✅ Corruption handled correctly"
-                  pkill -f inotifywait || true
-                  touch $out
-                  exit 0
-                fi
-                sleep 1
-              done
-
-              echo "❌ Corruption not handled"
-              cat bun-watcher.log
-              pkill -f inotifywait || true
-              exit 1
-            '';
-
-        watcher-file-move =
-          pkgs.runCommand "watcher-file-move-test"
-            {
-              nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
-                pkgs.coreutils
-                pkgs.gnugrep
-                pkgs.procps
-              ];
-            }
-            ''
-              set -euo pipefail
-
-              tmp=$(mktemp -d)
-              trap "rm -rf $tmp" EXIT
-
-              cp -r ${src}/. $tmp/project
-              chmod -R u+w $tmp/project
-              cd $tmp/project
-
-              rm -f bun-watcher.log
-
-              # Start the watcher
-              export HOME=/tmp
-              export USER=nixbld
-              export HOSTNAME=build
-              export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
-              ${self.devShells.${system}.default.shellHook}
-
-              # Wait for init
-              for i in {1..30}; do
-                if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
-                  break
-                fi
-                sleep 1
-              done
-
-              # Test file move
-              mkdir move-bun-here
-              mv bun.nix move-bun-here/
-              for i in {1..30}; do
-                if grep -q "External changes detected and corrected." bun-watcher.log && [ -f bun.nix ]; then
-                  echo "✅ File move handled correctly"
-                  pkill -f inotifywait || true
-                  rm -rf move-bun-here
-                  touch $out
-                  exit 0
-                fi
-                sleep 1
-              done
-
-              echo "❌ File move not handled"
-              cat bun-watcher.log
-              pkill -f inotifywait || true
-              rm -rf move-bun-here
-              exit 1
-            '';
-      };
+            echo "❌ File move not handled"
+            cat bun-watcher.log
+            pkill -f inotifywait || true
+            rm -rf move-bun-here
+            exit 1
+          '';
+        };
     };
 }
