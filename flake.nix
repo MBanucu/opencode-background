@@ -147,6 +147,7 @@
 
           print_external_warning() {
             local event="$1"
+            echo ""
             echo "⚠️  WARNING: bun.nix was $event externally!"
             echo "   bun.nix is an auto-generated file derived from bun.lock."
             echo "   Do NOT edit, create, or delete it manually."
@@ -196,6 +197,18 @@
             fi
           }
 
+          # === cleanup function ===
+          cleanup_watcher() {
+            # prevent duplicate cleanup
+            if ! $STOPPING; then
+              STOPPING=true
+              echo "Stopping bun.lock watcher..."
+              kill $INOTIFY_PID 2>/dev/null || true
+              kill $LOOP_PID 2>/dev/null || true
+              rm -f "$FIFO" 2>/dev/null || true
+            fi
+          }
+
           echo "Checking initial state..."
           sync_bun_nix "" false
 
@@ -211,7 +224,7 @@
           disown $INOTIFY_PID
           echo "Bun.lock watcher running (inotifywait PID $INOTIFY_PID)."
 
-          # Background reading loop using loop-level redirection to keep fifo open
+          # Background reading loop
           (
             set +euo pipefail
             set -m
@@ -247,8 +260,8 @@
           disown $LOOP_PID
           echo "Bun.lock watcher loop running (PID $LOOP_PID)."
 
-          # Clean shutdown
-          trap 'if ! $STOPPING; then STOPPING=true; echo "Stopping bun.lock watcher..."; kill $INOTIFY_PID 2>/dev/null || true; kill $LOOP_PID 2>/dev/null || true; rm -f "$FIFO"; fi' EXIT TERM INT
+          # Clean shutdown – uses dedicated function for easier extension
+          trap cleanup_watcher EXIT TERM
         '';
       };
     };
