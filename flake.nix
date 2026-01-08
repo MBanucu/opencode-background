@@ -287,6 +287,7 @@
               nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
                 pkgs.coreutils
                 pkgs.gnugrep
+                pkgs.procps
               ];
             }
             ''
@@ -329,6 +330,7 @@
               nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
                 pkgs.coreutils
                 pkgs.gnugrep
+                pkgs.procps
               ];
             }
             ''
@@ -382,6 +384,7 @@
               nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
                 pkgs.coreutils
                 pkgs.gnugrep
+                pkgs.procps
               ];
             }
             ''
@@ -435,6 +438,7 @@
               nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
                 pkgs.coreutils
                 pkgs.gnugrep
+                pkgs.procps
               ];
             }
             ''
