@@ -100,6 +100,83 @@ nix run github:MBanucu/opencode-background#uninstall
 
 This will remove the plugin files from `~/.config/opencode/plugin/`.
 
+### Testing the Nix Development Environment
+
+The Nix flake includes a dev shell with an integrated bun.lock file watcher that automatically manages `bun.nix` for dependency locking. Testing can be done manually or via automated flake checks.
+
+#### Manual Testing
+
+To test the watcher functionality manually:
+
+1. Enter the dev shell:
+
+   ```bash
+   nix develop
+   ```
+
+2. The watcher will start automatically and log to `bun-watcher.log`.
+
+3. Test file operations (in another terminal or after exiting the shell):
+
+   ```bash
+   # Remove generated files
+   rm bun.nix bun.lock
+
+   # Reinstall dependencies to recreate them
+   bun install
+
+   # Move files to test detection
+   mkdir -p move-bun-here
+   mv bun.nix move-bun-here/
+   mv bun.lock move-bun-here/
+
+   # Reinstall to recreate
+   bun install
+
+   # Clean up
+   rm -rf move-bun-here/
+   ```
+
+4. Exit the dev shell:
+
+   ```bash
+   exit
+   ```
+
+5. Check the log file for watcher activity:
+   ```bash
+   cat bun-watcher.log
+   ```
+
+The watcher detects file creations, deletions, and moves, regenerating `bun.nix` as needed and logging warnings for external modifications.
+
+#### Automated Testing
+
+The flake includes automated checks that run the devShell watcher in isolated environments and test various scenarios:
+
+- `watcher-init`: Verifies the watcher initializes correctly
+- `watcher-external-delete`: Tests detection and correction of external file deletion
+- `watcher-corruption`: Tests detection and correction of file corruption
+- `watcher-file-move`: Tests detection and correction of file moves
+
+Run all checks:
+
+```bash
+nix flake check
+```
+
+To see detailed output for individual checks (including test results and logs):
+
+```bash
+nix build .#checks.x86_64-linux.watcher-init --print-build-logs
+nix build .#checks.x86_64-linux.watcher-external-delete --print-build-logs
+nix build .#checks.x86_64-linux.watcher-corruption --print-build-logs
+nix build .#checks.x86_64-linux.watcher-file-move --print-build-logs
+```
+
+The automated tests run in Nix build environments and successfully validate watcher functionality, including file operation detection within the sandbox constraints.
+
+
 ## Usage
 
 [![asciicast](https://asciinema.org/a/FhwMJK48sUyKzoBe366YuhqS7.svg)](https://asciinema.org/a/FhwMJK48sUyKzoBe366YuhqS7)
