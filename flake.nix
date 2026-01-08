@@ -21,12 +21,13 @@
         TARGET="$PLUGIN_DIR/opencode-background.js"
         TARGET_DIR="$PLUGIN_DIR/opencode-background"
       '';
+      src = pkgs.lib.cleanSource ./.;
     in
     {
       packages.${system} = {
         default = bun2nix.mkDerivation {
           pname = "opencode-background";
-          version = packageJson.version; # Use extracted version
+          version = packageJson.version;
           src = ./.;
 
           bunDeps = bun2nix.fetchBunDeps {
@@ -60,7 +61,6 @@
             if [ -f "$SRC_INDEX" ]; then
               cp -f "$SRC_INDEX" "$TARGET"
 
-              # Only chmod if the directory exists
               if [[ -d "$TARGET_DIR" ]]; then
                 chmod -R u+w "$TARGET_DIR"
               fi
@@ -140,12 +140,10 @@
             fi
           }
 
-          # Inform the user once (on stdout)
           echo "bun.lock watcher active — all messages are logged to:"
           echo "    $LOG_FILE"
           echo "Use \`tail -f $LOG_FILE\` to watch live."
 
-          # === Custom Header ===
           log "=================================================="
           log "OpenCode Background – Development Shell Session"
           log "Project:   $(basename "$PWD")"
@@ -159,10 +157,8 @@
           log "=================================================="
           log ""
 
-          # Flag to prevent duplicate stop messages
           STOPPING=false
 
-          # === Helpers ===
           get_sha() {
             if [[ -f "$1" ]]; then
               sha256sum "$1" | awk '{print $1}'
@@ -175,7 +171,7 @@
             local event="$1"
             log "⚠︎ WARNING: bun.nix was $event externally!"
             log "  bun.nix is an auto-generated file derived from bun.lock."
-            log "  Do NOT edit, create, or delete it manually."
+            log "  Do NOT edit, create, delete it manually."
             log "  To change dependencies, use 'bun add', 'bun remove', etc."
           }
 
@@ -222,9 +218,7 @@
             fi
           }
 
-          # === cleanup function ===
           cleanup_watcher() {
-            # prevent duplicate cleanup
             if ! $STOPPING; then
               STOPPING=true
               log "Stopping bun.lock watcher..."
@@ -237,23 +231,20 @@
           log "Checking initial state..."
           sync_bun_nix "" false
 
-          # Create a named pipe
           FIFO=$(mktemp -u)
           mkfifo "$FIFO"
 
-          # Launch inotifywait writing to the fifo
           inotifywait -m -q --format "%e %f" \
             -e create -e delete -e modify -e moved_to -e moved_from \
             . > "$FIFO" 2>/dev/null &
           INOTIFY_PID=$!
           log "Bun.lock watcher running (inotifywait PID $INOTIFY_PID)."
 
-          # Background reading loop
           (
             set +euo pipefail
             set -m
 
-            exec 3< "$FIFO"  # Open fifo for reading on fd 3
+            exec 3< "$FIFO"
 
             handle_bun_nix() {
               local event="$1"
@@ -278,76 +269,221 @@
               esac
             done <&3
 
-            exec 3<&-  # Close fd on exit
+            exec 3<&-
           ) &
           LOOP_PID=$!
           log "Bun.lock watcher loop running (PID $LOOP_PID)."
 
-          # Clean shutdown
           trap cleanup_watcher EXIT TERM
 
           log "bun.lock watcher fully initialized."
         '';
       };
 
-      checks.${system}.devshell-watcher-integration =
-        pkgs.runCommand "devshell-watcher-test"
-          {
-            nativeBuildInputs = [
-              pkgs.coreutils
-              pkgs.gnugrep
-              pkgs.gawk
-              pkgs.which
-            ];
-          }
-          ''
-            set -euo pipefail
+      checks.${system} = {
+        watcher-init =
+          pkgs.runCommand "watcher-init-test"
+            {
+              nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
+                pkgs.coreutils
+                pkgs.gnugrep
+              ];
+            }
+            ''
+              set -euo pipefail
 
-            # Create isolated temp project dir from flake source (avoids polluting repo)
-            tmp=$(mktemp -d)
-            cp -r ${self} $tmp/project
-            chmod -R u+w $tmp/project
-            cd $tmp/project
+              tmp=$(mktemp -d)
+              trap "rm -rf $tmp" EXIT
 
-            # Clean state: remove generated files/log
-            rm -f bun.nix bun-watcher.log
+              cp -r ${src}/. $tmp/project
+              chmod -R u+w $tmp/project
+              cd $tmp/project
 
-            echo "Running devShell hook..."
-            # Set required environment variables for the hook
-            export HOME=/tmp
-            export USER=nixbld
-            export HOSTNAME=build
-            # Ensure bun2nix is in PATH
-            export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
-            # Execute the shellHook directly in this environment
-            ${self.devShells.${system}.default.shellHook}
+              rm -f bun-watcher.log
 
-            # Give time for watcher to initialize
-            sleep 15
+              # Start the watcher
+              export HOME=/tmp
+              export USER=nixbld
+              export HOSTNAME=build
+              export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
+              ${self.devShells.${system}.default.shellHook}
 
-            # Assert watcher initialized
-            if ! grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
+              # Wait for initialization
+              for i in {1..30}; do
+                if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
+                  echo "✅ Watcher initialized successfully"
+                  touch $out
+                  exit 0
+                fi
+                sleep 1
+              done
+
               echo "❌ Watcher failed to initialize"
               cat bun-watcher.log
               exit 1
-            fi
+            '';
 
-            # Assert initial sync: bun.nix should be generated if missing
-            if [ ! -f bun.nix ]; then
-              echo "❌ bun.nix not generated on startup"
+        watcher-external-delete =
+          pkgs.runCommand "watcher-external-delete-test"
+            {
+              nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
+                pkgs.coreutils
+                pkgs.gnugrep
+              ];
+            }
+            ''
+              set -euo pipefail
+
+              tmp=$(mktemp -d)
+              trap "rm -rf $tmp" EXIT
+
+              cp -r ${src}/. $tmp/project
+              chmod -R u+w $tmp/project
+              cd $tmp/project
+
+              rm -f bun-watcher.log
+
+              # Start the watcher
+              export HOME=/tmp
+              export USER=nixbld
+              export HOSTNAME=build
+              export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
+              ${self.devShells.${system}.default.shellHook}
+
+              # Wait for init
+              for i in {1..30}; do
+                if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
+                  break
+                fi
+                sleep 1
+              done
+
+              # Test external deletion
+              rm -f bun.nix
+              for i in {1..30}; do
+                if grep -q "External changes detected and corrected." bun-watcher.log && [ -f bun.nix ]; then
+                  echo "✅ External delete handled correctly"
+                  pkill -f inotifywait || true
+                  touch $out
+                  exit 0
+                fi
+                sleep 1
+              done
+
+              echo "❌ External delete not handled"
+              cat bun-watcher.log
+              pkill -f inotifywait || true
               exit 1
-            fi
-            echo "✅ Initial sync worked"
+            '';
 
-            # Note: External change correction test is skipped due to Nix sandbox limitations on file watching
+        watcher-corruption =
+          pkgs.runCommand "watcher-corruption-test"
+            {
+              nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
+                pkgs.coreutils
+                pkgs.gnugrep
+              ];
+            }
+            ''
+              set -euo pipefail
 
-            # Cleanup background processes
-            # Note: In the hook, processes are disowned, so need to find and kill them
-            pkill -f "inotifywait" || true
-            pkill -f "bun.lock watcher loop" || true
+              tmp=$(mktemp -d)
+              trap "rm -rf $tmp" EXIT
 
-            echo "✅ All tests passed"
-            touch $out
-          '';
+              cp -r ${src}/. $tmp/project
+              chmod -R u+w $tmp/project
+              cd $tmp/project
+
+              rm -f bun-watcher.log
+
+              # Start the watcher
+              export HOME=/tmp
+              export USER=nixbld
+              export HOSTNAME=build
+              export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
+              ${self.devShells.${system}.default.shellHook}
+
+              # Wait for init
+              for i in {1..30}; do
+                if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
+                  break
+                fi
+                sleep 1
+              done
+
+              # Test corruption
+              echo "# corrupted" >> bun.nix
+              for i in {1..30}; do
+                if grep -q "External changes detected and corrected." bun-watcher.log && ! grep -q "# corrupted" bun.nix; then
+                  echo "✅ Corruption handled correctly"
+                  pkill -f inotifywait || true
+                  touch $out
+                  exit 0
+                fi
+                sleep 1
+              done
+
+              echo "❌ Corruption not handled"
+              cat bun-watcher.log
+              pkill -f inotifywait || true
+              exit 1
+            '';
+
+        watcher-file-move =
+          pkgs.runCommand "watcher-file-move-test"
+            {
+              nativeBuildInputs = self.devShells.${system}.default.buildInputs ++ [
+                pkgs.coreutils
+                pkgs.gnugrep
+              ];
+            }
+            ''
+              set -euo pipefail
+
+              tmp=$(mktemp -d)
+              trap "rm -rf $tmp" EXIT
+
+              cp -r ${src}/. $tmp/project
+              chmod -R u+w $tmp/project
+              cd $tmp/project
+
+              rm -f bun-watcher.log
+
+              # Start the watcher
+              export HOME=/tmp
+              export USER=nixbld
+              export HOSTNAME=build
+              export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
+              ${self.devShells.${system}.default.shellHook}
+
+              # Wait for init
+              for i in {1..30}; do
+                if grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
+                  break
+                fi
+                sleep 1
+              done
+
+              # Test file move
+              mkdir move-bun-here
+              mv bun.nix move-bun-here/
+              for i in {1..30}; do
+                if grep -q "External changes detected and corrected." bun-watcher.log && [ -f bun.nix ]; then
+                  echo "✅ File move handled correctly"
+                  pkill -f inotifywait || true
+                  rm -rf move-bun-here
+                  touch $out
+                  exit 0
+                fi
+                sleep 1
+              done
+
+              echo "❌ File move not handled"
+              cat bun-watcher.log
+              pkill -f inotifywait || true
+              rm -rf move-bun-here
+              exit 1
+            '';
+      };
     };
 }
