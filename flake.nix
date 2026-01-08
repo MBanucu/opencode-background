@@ -26,7 +26,7 @@
       packages.${system} = {
         default = bun2nix.mkDerivation {
           pname = "opencode-background";
-          version = packageJson.version;  # Use extracted version
+          version = packageJson.version; # Use extracted version
           src = ./.;
 
           bunDeps = bun2nix.fetchBunDeps {
@@ -50,9 +50,7 @@
 
           text = ''
             ${sharedVars}
-            SRC_OPENCODE_BACKGROUND_DIR="${
-              self.packages.${system}.default
-            }"
+            SRC_OPENCODE_BACKGROUND_DIR="${self.packages.${system}.default}"
             SRC_INDEX="$SRC_OPENCODE_BACKGROUND_DIR/dist/index.js"
 
             echo "Installing OpenCode Background plugin..."
@@ -291,5 +289,65 @@
           log "bun.lock watcher fully initialized."
         '';
       };
+
+      checks.${system}.devshell-watcher-integration =
+        pkgs.runCommand "devshell-watcher-test"
+          {
+            nativeBuildInputs = [
+              pkgs.coreutils
+              pkgs.gnugrep
+              pkgs.gawk
+              pkgs.which
+            ];
+          }
+          ''
+            set -euo pipefail
+
+            # Create isolated temp project dir from flake source (avoids polluting repo)
+            tmp=$(mktemp -d)
+            cp -r ${self} $tmp/project
+            chmod -R u+w $tmp/project
+            cd $tmp/project
+
+            # Clean state: remove generated files/log
+            rm -f bun.nix bun-watcher.log
+
+            echo "Running devShell hook..."
+            # Set required environment variables for the hook
+            export HOME=/tmp
+            export USER=nixbld
+            export HOSTNAME=build
+            # Ensure bun2nix is in PATH
+            export PATH="${self.inputs.bun2nix.packages.${system}.default}/bin:$PATH"
+            # Execute the shellHook directly in this environment
+            ${self.devShells.${system}.default.shellHook}
+
+            # Give time for watcher to initialize
+            sleep 15
+
+            # Assert watcher initialized
+            if ! grep -q "bun.lock watcher fully initialized." bun-watcher.log; then
+              echo "❌ Watcher failed to initialize"
+              cat bun-watcher.log
+              exit 1
+            fi
+
+            # Assert initial sync: bun.nix should be generated if missing
+            if [ ! -f bun.nix ]; then
+              echo "❌ bun.nix not generated on startup"
+              exit 1
+            fi
+            echo "✅ Initial sync worked"
+
+            # Note: External change correction test is skipped due to Nix sandbox limitations on file watching
+
+            # Cleanup background processes
+            # Note: In the hook, processes are disowned, so need to find and kill them
+            pkill -f "inotifywait" || true
+            pkill -f "bun.lock watcher loop" || true
+
+            echo "✅ All tests passed"
+            touch $out
+          '';
     };
 }
