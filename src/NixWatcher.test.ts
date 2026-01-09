@@ -1,6 +1,14 @@
 import { execSync, spawn } from 'child_process';
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, cpSync, readdirSync, readFileSync, existsSync } from 'fs';
+import {
+  mkdtempSync,
+  cpSync,
+  readdirSync,
+  readFileSync,
+  existsSync,
+  copyFileSync,
+  mkdirSync,
+} from 'fs';
 import { setTimeout } from 'timers';
 
 function fileContains(filePath: string, search: string): boolean {
@@ -28,10 +36,37 @@ function countProcesses(processName: string) {
   return count;
 }
 
-describe('Nix Watcher Integration Tests', () => {
+function isNixAvailable(): boolean {
+  try {
+    execSync('which nix', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe.skipIf(!isNixAvailable())('Nix Watcher Integration Tests', () => {
   it('should sync bun.lock changes to bun.nix and clean up processes', async () => {
     const temp = mkdtempSync('/tmp/');
-    cpSync('.', temp, { recursive: true });
+    // Copy only lock files, nix files, and json files
+    const filesToCopy = [
+      'bun.lock',
+      'bun.nix',
+      'flake.nix',
+      'flake.lock',
+      'package.json',
+    ];
+    for (const file of filesToCopy) {
+      if (existsSync(file)) {
+        const destPath = `${temp}/${file}`;
+        // Ensure destination directory exists
+        const destDir = destPath.substring(0, destPath.lastIndexOf('/'));
+        if (destDir && !existsSync(destDir)) {
+          mkdirSync(destDir, { recursive: true });
+        }
+        copyFileSync(file, destPath);
+      }
+    }
     process.chdir(temp);
 
     const initialCount = countProcesses('inotifywait');
@@ -55,6 +90,28 @@ describe('Nix Watcher Integration Tests', () => {
   }, 10000);
 
   it('should not leave inotifywait processes after command', async () => {
+    const temp = mkdtempSync('/tmp/');
+    // Copy only lock files, nix files, and json files
+    const filesToCopy = [
+      'bun.lock',
+      'bun.nix',
+      'flake.nix',
+      'flake.lock',
+      'package.json',
+    ];
+    for (const file of filesToCopy) {
+      if (existsSync(file)) {
+        const destPath = `${temp}/${file}`;
+        // Ensure destination directory exists
+        const destDir = destPath.substring(0, destPath.lastIndexOf('/'));
+        if (destDir && !existsSync(destDir)) {
+          mkdirSync(destDir, { recursive: true });
+        }
+        copyFileSync(file, destPath);
+      }
+    }
+    process.chdir(temp);
+
     const initialCount = countProcesses('inotifywait');
     const output = execSync(
       'WATCHER_TIMEOUT=2 timeout 10 nix develop --command echo "Hello World"',
@@ -83,6 +140,28 @@ describe('Nix Watcher Integration Tests', () => {
   }, 10000);
 
   it('should pass nix flake check', () => {
+    const temp = mkdtempSync('/tmp/');
+    // Copy only lock files, nix files, and json files
+    const filesToCopy = [
+      'bun.lock',
+      'bun.nix',
+      'flake.nix',
+      'flake.lock',
+      'package.json',
+    ];
+    for (const file of filesToCopy) {
+      if (existsSync(file)) {
+        const destPath = `${temp}/${file}`;
+        // Ensure destination directory exists
+        const destDir = destPath.substring(0, destPath.lastIndexOf('/'));
+        if (destDir && !existsSync(destDir)) {
+          mkdirSync(destDir, { recursive: true });
+        }
+        copyFileSync(file, destPath);
+      }
+    }
+    process.chdir(temp);
+
     execSync('nix flake check', { stdio: 'inherit' });
   }, 20000);
 });

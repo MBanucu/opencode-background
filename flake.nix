@@ -228,9 +228,6 @@
             fi
           }
 
-          log "Checking initial state..."
-          sync_bun_nix "" false
-
           FIFO=$(mktemp -u)
           mkfifo "$FIFO"
 
@@ -289,6 +286,14 @@
           trap cleanup_watcher EXIT TERM
 
           log "bun.lock watcher fully initialized."
+
+          # Explicitly wait for inotifywait to be alive and signalable
+          while ! kill -0 "$INOTIFY_PID" 2>/dev/null; do
+            sleep 0.01
+          done
+
+          log "Checking initial state..."
+          sync_bun_nix "" false
         '';
       };
 
