@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0-alpha.2](https://github.com/MBanucu/opencode-background/compare/v1.1.1-alpha.2...v1.2.0-alpha.2) (2026-01-09)
+
+
+### Features
+
+* migrate build system to Bun with Nix integration ([31c0c02](https://github.com/MBanucu/opencode-background/commit/31c0c02e4815a35340622e3d61bb946765794cb2))
+
+
+### Bug Fixes
+
+* address CI failures - remove unused import and add coreutils to devShell ([382d5fe](https://github.com/MBanucu/opencode-background/commit/382d5fed710cd78f416d57275c8d1199d3b4a83a))
+
 ## [1.1.1-alpha.2](https://github.com/MBanucu/opencode-background/compare/v1.1.0-alpha.2...v1.1.1-alpha.2) (2026-01-06)
 
 
