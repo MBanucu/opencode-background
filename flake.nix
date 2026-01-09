@@ -234,6 +234,8 @@
           FIFO=$(mktemp -u)
           mkfifo "$FIFO"
 
+          WATCHER_TIMEOUT=''${WATCHER_TIMEOUT:-60}
+
 
           if [[ $- == *i* ]]; then
             echo "Interactive nix develop session detected – starting persistent bun.lock watcher with cleanup on exit"
@@ -241,8 +243,8 @@
               -e create -e delete -e modify -e moved_to -e moved_from \
               . > "$FIFO" 2>/dev/null &
           else
-            echo "Non-interactive nix develop --command detected – starting bun.lock watcher with 60s timeout"
-            timeout 60 inotifywait -m -q --format "%e %f" \
+            echo "Non-interactive nix develop --command detected – starting bun.lock watcher with $WATCHER_TIMEOUT s timeout"
+            timeout $WATCHER_TIMEOUT inotifywait -m -q --format "%e %f" \
               -e create -e delete -e modify -e moved_to -e moved_from \
               . > "$FIFO" 2>/dev/null &
           fi
