@@ -126,6 +126,7 @@
           mise
           bun2nix
           inotify-tools
+          coreutils
         ];
 
         shellHook = ''
